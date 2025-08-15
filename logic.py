@@ -23,7 +23,10 @@ class Logic(QMainWindow, Ui_MainWindow):
         try:
             """Error coding to ensure a number is entered"""
             time = float(self.periodDurTextEdit.toPlainText().strip())
+            if time < 0 or time > 300:
+                raise ValueError
         except ValueError:
+            self.numberError('Enter a valid number (0-300)')
             print('Please enter a valid period number.')
             return
 
@@ -49,7 +52,7 @@ class Logic(QMainWindow, Ui_MainWindow):
         self.practiceTotalLcd.display(total)
         self.practiceDurTotalLcd.display(timeTotal)
 
-    def view_Practice(self, full_path):
+    def view_Practice(self, full_path: str) -> None:
         """This chunk is used to display the practice data and is the underlying table set up"""
         practice = pd.read_csv(full_path)
         self.tableWidget.setRowCount(len(practice))
@@ -61,31 +64,36 @@ class Logic(QMainWindow, Ui_MainWindow):
                 value = str(practice.iat[row, col])
                 self.tableWidget.setItem(row, col, QTableWidgetItem(value))
 
-    def practice_Total(self,full_path):
+    def practice_Total(self,full_path: str) -> int:
         """This chunk is used to display the total practice load and is the underlying LCD set up"""
         totals = pd.read_csv(full_path)
         total = totals['Total PL'].sum()
         return total
 
-    def practiceTime_Total(self,full_path):
+    def practiceTime_Total(self,full_path: str) -> int:
         """This chunk is used to display the total practice time and is the underlying LCD set up"""
         totals = pd.read_csv(full_path)
         timeTotal = totals['Time'].sum()
         return timeTotal
 
-def get_opponents():
+    def numberError(self, errorMessage: str) -> None:
+        error_box = QMessageBox()
+        error_box.setText(errorMessage)
+        error_box.exec()
+
+def get_opponents() -> list:
     """This chunk allows for the loading of the opponents from the individual csv file"""
     #self.selectOppBox.addItems(logic.get_opponents())
     opponents = pd.read_csv('Opponents.csv')
     return opponents['Opponent'].dropna().tolist()
 
-def get_practiceNum():
+def get_practiceNum() -> list:
     """This chunk allows for selecting of the different practice number for that week"""
     #self.selectPracNumBox.addItems(logic.get_practiceNum())
     practices = ['P1', 'P2', 'P3', 'P4']
     return practices
 
-def get_periodNames():
+def get_periodNames() -> list:
     """This chunk allows for the creation of the list of previously succinct and prepared period names (building blocks for practice)"""
     #self.selectPracPeriodBox.addItems(logic.get_periodNames())
     return list(plValues_dict.keys())
