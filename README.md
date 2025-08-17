@@ -1,6 +1,7 @@
 # Practice Volume Calculator for Catapult
 Set up:
 - Download pycharm for free
+- Download python for free
 - Save the folder wherever but keep everything in the folder
 - Open the file called “logic.py"
 - Scroll to the bottom and enter in your own schedule and practice number options you want
