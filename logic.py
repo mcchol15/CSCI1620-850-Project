@@ -22,46 +22,81 @@ class Logic(QMainWindow, Ui_MainWindow):
         self.populate_prev_practice_box()
         self.loadPrevPracButton.clicked.connect(self.load_previous_practice)
 
-    def update(self) -> None:
-        """
-        Add a new period row to the current practice CSV using the existing UI inputs,
-        then refresh the table and totals.
-
-        CSV path (and name) comes from the current Opponent, Practice #, and Date
-        via _current_practice_csv_path(), matching the rest of the app.
-        """
+    def update(self):
+        """Called when the user hits Add; creates/appends a CSV to store the practice information."""
         import os, csv
         from PyQt6.QtWidgets import QMessageBox
 
-        # ---- 1) Collect inputs from your UI ----
-        # Period name (single line or multi-line widget; try both common cases)
-        period = ""
-        if hasattr(self, "addPeriodNameTextEdit"):
-            period = (self.addPeriodNameTextEdit.toPlainText() or "").strip()
-        elif hasattr(self, "addPeriodNameLineEdit"):
-            period = (self.addPeriodNameLineEdit.text() or "").strip()
+        # Collect current selections / inputs
+        opp = self.selectOppBox.currentText()
+        pNum = self.selectPracNumBox.currentText()
+        date = self.pracDateCalendar.selectedDate().toString("MM-dd-yy")
+        period = self.selectPracPeriodBox.currentText()
 
-        # Time (expect an integer number of minutes; if you allow mm:ss, adapt as needed)
-        time_raw = ""
-        if hasattr(self, "addPeriodNewTimeTextEdit_2"):
-            time_raw = (self.addPeriodNewTimeTextEdit_2.toPlainText() or "").strip()
-        elif hasattr(self, "addPeriodNewTimeTextEdit"):
-            time_raw = (self.addPeriodNewTimeTextEdit.toPlainText() or "").strip()
-        elif hasattr(self, "addPeriodTimeLineEdit"):
-            time_raw = (self.addPeriodTimeLineEdit.text() or "").strip()
+        # Validate time input
+        try:
+            time = float(self.periodDurTextEdit.toPlainText().strip())
+            if time < 0 or time > 300:
+                raise ValueError
+        except ValueError:
+            self.numberError('Enter a valid number (0-300)')
+            print('Please enter a valid period number.')
+            return
 
-        # PL / min (commonly a spin box); if not present, default to 0.0
-        pl_per_min = 0.0
-        if hasattr(self, "plPerMinDoubleSpinBox"):
-            pl_per_min = float(self.plPerMinDoubleSpinBox.value())
+        # Build target file path (NEW file name comes from current UI selections)
+        csv_name = f'{opp} - {pNum} - {date}.csv'
+        folder = "Practice Scripts"  # capital S per your convention
+        full_path = os.path.join(folder, csv_name)
+
+        # Ensure folder exists so writes don’t fail
+        os.makedirs(folder, exist_ok=True)
+
+        # Create row with PL/min from Period Amounts.csv
+        try:
+            pl_per_min = round(plValues_dict[period]['PLm.Avg'], 2)
+        except Exception:
+            self.numberError(f"Missing PL/min for period '{period}'. Check 'Period Amounts.csv'.")
+            return
+
+        header = ['Period', 'Time', 'PL / min', 'Total PL']
+        row = [period, time, pl_per_min, round(float(time * pl_per_min), 1)]
+
+        # Write header if new file, then append row
+        file_exists = os.path.isfile(full_path)
+        with open(full_path, mode='a' if file_exists else 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            if not file_exists:
+                writer.writerow(header)
+            writer.writerow(row)
+
+        # ✅ The part that was missing:
+        # Pin the active CSV to THIS new path so later edits act on it
+        self._active_csv_path = full_path
+
+        # Refresh table and totals
+        self.view_Practice(full_path)
+        total = self.practice_Total(full_path)
+        timeTotal = self.practiceTime_Total(full_path)
+        self.practiceTotalLcd.display(total)
+        self.practiceDurTotalLcd.display(timeTotal)
+
+        # Clear time entry for next add
+        self.periodDurTextEdit.clear()
+
+        QMessageBox.information(
+            self,
+            "Added",
+            f"Added '{period}' — {int(time)} min @ {pl_per_min} PL/min (Total PL {round(float(time * pl_per_min), 1)}).\n"
+            f"File: {os.path.basename(full_path)}"
+        )
 
     def _current_practice_csv_path(self) -> str:
         import os
         opp = self.selectOppBox.currentText()
-        pNum = self.selectPracNumBox.currentText()
+        pnum = self.selectPracNumBox.currentText()
         date = self.pracDateCalendar.selectedDate().toString("MM-dd-yy")
-        csv_name = f"{opp} - {pNum} - {date}.csv"
-        folder = "Practice Scripts"  # <-- unified folder name
+        csv_name = f"{opp} - {pnum} - {date}.csv"
+        folder = "Practice Scripts"  # capital S per your convention
         return os.path.join(folder, csv_name)
 
     def remove_selected_period(self) -> None:
